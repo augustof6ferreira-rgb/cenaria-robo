@@ -1,0 +1,38 @@
+# Robô do Cenaria: todo dia às 19h (Brasília) monta os 3 vídeos de amanhã na nuvem e guarda no cofre (R2).
+# Repositório público = minutos ilimitados no GitHub Actions. Aqui só tem a rotina: nenhuma chave, nenhum código do site.
+# Nada fica salvo aqui: sem "artifacts"; o computador do GitHub é apagado ao terminar.
+name: Cenaria robô
+
+on:
+  schedule:
+    - cron: '0 22 * * *'  # 22:00 UTC = 19:00 em Brasília
+  workflow_dispatch:       # botão "Run workflow" para testar na hora
+    inputs:
+      qtd:
+        description: 'Quantos vídeos'
+        default: '3'
+
+concurrency: robo
+
+jobs:
+  videos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Instalar Chrome, Playwright e ffmpeg
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+          mkdir -p /tmp/robo && cp rodar.mjs /tmp/robo/ && cd /tmp/robo
+          echo '{"type":"module"}' > package.json
+          npm install --no-audit --no-fund playwright@1
+          npx playwright install --with-deps chrome
+      - name: Montar e enviar os vídeos
+        env:
+          ROBO_TOKEN: ${{ secrets.ROBO_TOKEN }}
+          QTD: ${{ github.event.inputs.qtd || '3' }}
+        working-directory: /tmp/robo
+        run: node rodar.mjs
