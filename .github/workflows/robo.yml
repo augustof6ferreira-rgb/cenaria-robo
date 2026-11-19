@@ -1,11 +1,12 @@
-# Robô do Cenaria: todo dia às 19h (Brasília) monta os 3 vídeos de amanhã na nuvem e guarda no cofre (R2).
+# Robô do Cenaria: todo dia à 1h (Brasília) monta os 3 vídeos do dia (8h, 17h, 20h) e guarda no cofre (R2).
+# Às 6h50 o Claude pede a aprovação no celular: se algo falhar, dá tempo de corrigir durante o dia.
 # Repositório público = minutos ilimitados no GitHub Actions. Aqui só tem a rotina: nenhuma chave, nenhum código do site.
 # Nada fica salvo aqui: sem "artifacts"; o computador do GitHub é apagado ao terminar.
 name: Cenaria robô
 
 on:
   schedule:
-    - cron: '0 22 * * *'  # 22:00 UTC = 19:00 em Brasília
+    - cron: '0 4 * * *'   # 04:00 UTC = 01:00 em Brasília
   workflow_dispatch:       # botão "Run workflow" para testar na hora
     inputs:
       qtd:
@@ -17,7 +18,7 @@ concurrency: robo
 jobs:
   videos:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 300
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
