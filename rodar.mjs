@@ -52,7 +52,15 @@ await page.waitForTimeout(5000); // termina de salvar o último download
 await browser.close();
 
 let enviados = 0;
+let descartados = 0;
 for (const v of r?.videos || []) {
+  // trava de qualidade: vídeo com cena sem imagem (ou sem voz) não vai para o cofre — evita "tela verde" na aprovação
+  const falta = [].concat(v.itensFaltando || v.falta || []).join(' | ');
+  if (/cenas com imagem/i.test(falta)) {
+    descartados++;
+    console.log(`[robo] vídeo ${v.ordem + 1} DESCARTADO: cena(s) sem imagem ou voz (${falta})`);
+    continue;
+  }
   const bruto = arquivos.get(v.arquivo);
   if (!bruto) { console.log(`vídeo ${v.ordem + 1}: download não chegou`); continue; }
   const final = bruto.replace(/\.mp4$/, '-final.mp4');
@@ -68,5 +76,5 @@ for (const v of r?.videos || []) {
   console.log(`✔ vídeo ${v.ordem + 1} no cofre: ${j.titulo} · nota ${j.nota} · ${(statSync(final).size / 1048576).toFixed(1)} MB · posta ${j.quando}`);
 }
 for (const e of r?.erros || []) console.log('erro:', e);
-console.log(`Resumo: ${enviados}/${QTD} vídeo(s) prontos para aprovação.`);
+console.log(`Resumo: ${enviados}/${QTD} vídeo(s) prontos para aprovação${descartados ? ` · ${descartados} descartado(s) por falta de imagem/voz` : ''}.`);
 process.exit(enviados ? 0 : 1);
