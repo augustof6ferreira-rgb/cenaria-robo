@@ -74,6 +74,11 @@ for (const v of r?.videos || []) {
   if (!resp.ok) { console.log(`vídeo ${v.ordem + 1}: envio falhou (${resp.status}) ${j.erro || ''}`); continue; }
   enviados++;
   console.log(`✔ vídeo ${v.ordem + 1} no cofre: ${j.titulo} · nota ${j.nota} · ${(statSync(final).size / 1048576).toFixed(1)} MB · posta ${j.quando}`);
+  // textos exatos do post para a tarefa que agenda no Metricool (ela lê este log com `gh api` e decodifica com base64 -d;
+  // a leitura pelo site resumia a legenda em vez de copiar)
+  const tags = (j.hashtags || []).map((h) => `#${String(h).replace(/^#/, '')}`).join(' ');
+  const post = { id: j.id, titulo: j.titulo || '', texto: [String(j.descricao || '').trim(), tags].filter(Boolean).join('\n\n'), comentario: j.comentario || '' };
+  console.log(`[post] ${j.id} ${Buffer.from(JSON.stringify(post)).toString('base64')}`);
 }
 for (const e of r?.erros || []) console.log('erro:', e);
 console.log(`Resumo: ${enviados}/${QTD} vídeo(s) prontos para aprovação${descartados ? ` · ${descartados} descartado(s) por falta de imagem/voz` : ''}.`);
