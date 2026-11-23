@@ -11,7 +11,7 @@ on:
     inputs:
       qtd:
         description: 'Quantos vídeos'
-        default: '3'
+        default: '2'
 
 concurrency: robo
 
@@ -34,6 +34,6 @@ jobs:
       - name: Montar e enviar os vídeos
         env:
           ROBO_TOKEN: ${{ secrets.ROBO_TOKEN }}
-          QTD: ${{ github.event.inputs.qtd || '3' }}
+          QTD: ${{ github.event.inputs.qtd || '2' }}
         working-directory: /tmp/robo
         run: node rodar.mjs
