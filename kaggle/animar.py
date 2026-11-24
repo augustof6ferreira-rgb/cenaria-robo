@@ -30,13 +30,23 @@ from diffusers.utils import export_to_video, load_image  # noqa: E402
 relatorio['gpu'] = torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'SEM GPU'
 print('GPU:', relatorio['gpu'], flush=True)
 
-entrada = glob.glob('/kaggle/input/**/cenas.json', recursive=True)
-if not entrada:
-    relatorio['erros'].append('cenas.json não encontrado no dataset')
-    salvar_relatorio()
-    sys.exit(1)
-base = os.path.dirname(entrada[0])
-config = json.load(open(entrada[0]))
+if 'CENAS_EMBUTIDAS' in globals():
+    # cenas vieram dentro do próprio código (enviado pela ponte do Cenaria): imagens em base64
+    import base64
+    base = '/tmp/entrada'
+    os.makedirs(base, exist_ok=True)
+    config = CENAS_EMBUTIDAS  # noqa: F821
+    for c in config['cenas']:
+        with open(os.path.join(base, c['arquivo']), 'wb') as f:
+            f.write(base64.b64decode(c.pop('imagem_b64')))
+else:
+    entrada = glob.glob('/kaggle/input/**/cenas.json', recursive=True)
+    if not entrada:
+        relatorio['erros'].append('cenas.json não encontrado no dataset')
+        salvar_relatorio()
+        sys.exit(1)
+    base = os.path.dirname(entrada[0])
+    config = json.load(open(entrada[0]))
 cenas = config['cenas']
 W, H = int(config.get('largura', 512)), int(config.get('altura', 896))       # múltiplos de 32, vertical 9:16
 QUADROS = int(config.get('quadros', 97))                                     # 8k+1 quadros; 97 = 4 s a 24 fps

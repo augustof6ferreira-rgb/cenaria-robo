@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Teste da Fase 2: 4 cenas dreamcore do Cenaria -> GPU grátis do Kaggle (LTX-Video) -> vídeo de amostra.
-# Precisa dos segredos do GitHub: ROBO_TOKEN, KAGGLE_USERNAME, KAGGLE_KEY.
+# Só precisa do segredo ROBO_TOKEN: a chave do Kaggle fica no Cloudflare e o site faz a ponte (/api/robo/kaggle/...).
 set -euo pipefail
 SITE="${SITE:-https://cenariavideos.com}"
-U="$KAGGLE_USERNAME"
-TRAB=/tmp/kaggle; rm -rf "$TRAB"; mkdir -p "$TRAB/dados" "$TRAB/kernel" "$TRAB/saida" ~/.kaggle
-printf '{"username":"%s","key":"%s"}' "$KAGGLE_USERNAME" "$KAGGLE_KEY" > ~/.kaggle/kaggle.json && chmod 600 ~/.kaggle/kaggle.json
+PONTE="$SITE/api/robo/kaggle/kernels"
+SLUG=cenaria-animar
+TRAB=/tmp/kaggle; rm -rf "$TRAB"; mkdir -p "$TRAB/dados" "$TRAB/saida"
 
 ESTILO='dark dreamcore cinematic film still, liminal and eerie atmosphere, muted cold teal and deep blue palette with faint amber light, thin fog and volumetric haze, lonely tiny human silhouettes or astronauts against vast emptiness, deep black shadows, soft focus, 35mm film grain look, photorealistic'
 
@@ -35,42 +35,49 @@ for linha in "${CENAS[@]}"; do
 done
 echo "$json]}" > "$TRAB/dados/cenas.json"
 
-echo "== 2) enviando as cenas ao Kaggle (dataset $U/cenaria-cenas)"
-cat > "$TRAB/dados/dataset-metadata.json" <<EOF
-{"title":"cenaria-cenas","id":"$U/cenaria-cenas","licenses":[{"name":"CC0-1.0"}]}
-EOF
-if kaggle datasets status "$U/cenaria-cenas" >/dev/null 2>&1; then
-  kaggle datasets version -p "$TRAB/dados" -m "teste $(date -u +%FT%T)" -q
-else
-  kaggle datasets create -p "$TRAB/dados" -q
-fi
-for i in $(seq 1 30); do
-  st=$(kaggle datasets status "$U/cenaria-cenas" 2>/dev/null || echo "?")
-  echo "  dataset: $st"; [ "$st" = "ready" ] && break; sleep 10
-done
+echo "== 2) montando o código do Kaggle com as cenas embutidas (imagens reduzidas a 512x896)"
+python3 - "$TRAB/dados" "$(dirname "$0")/animar.py" > "$TRAB/kernel.py" <<'PY'
+import base64, json, subprocess, sys, os
+dados, script = sys.argv[1], sys.argv[2]
+cfg = json.load(open(os.path.join(dados, 'cenas.json')))
+for c in cfg['cenas']:
+    src = os.path.join(dados, c['arquivo']); peq = src + '.small.jpg'
+    subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', src, '-vf', 'scale=512:896', '-q:v', '3', peq], check=True)
+    c['imagem_b64'] = base64.b64encode(open(peq, 'rb').read()).decode()
+print('CENAS_EMBUTIDAS = ' + json.dumps(cfg))
+print(open(script).read())
+PY
+echo "  código: $(stat -c%s "$TRAB/kernel.py") bytes"
 
-echo "== 3) disparando a GPU do Kaggle"
-cp "$(dirname "$0")/animar.py" "$TRAB/kernel/"
-cat > "$TRAB/kernel/kernel-metadata.json" <<EOF
-{"id":"$U/cenaria-animar","title":"cenaria-animar","code_file":"animar.py","language":"python","kernel_type":"script",
- "is_private":true,"enable_gpu":true,"enable_internet":true,"dataset_sources":["$U/cenaria-cenas"],
- "competition_sources":[],"kernel_sources":[],"model_sources":[]}
-EOF
-kaggle kernels push -p "$TRAB/kernel"
+echo "== 3) disparando a GPU do Kaggle (pela ponte do Cenaria)"
+python3 -c 'import json,sys; print(json.dumps({"titulo":"cenaria-animar","codigo":open(sys.argv[1]).read()}))' "$TRAB/kernel.py" > "$TRAB/push.json"
+resp=$(curl -sS -X POST "$PONTE/push?slug=$SLUG" -H "x-robo: $ROBO_TOKEN" -H 'content-type: application/json' --data-binary @"$TRAB/push.json")
+echo "  resposta: $resp"
+echo "$resp" | grep -qi '"error"\|"erro"' && { echo "PUSH FALHOU"; exit 1; }
 inicio=$(date +%s)
 while true; do
   sleep 30
-  st=$(kaggle kernels status "$U/cenaria-animar" 2>&1 | tail -1)
+  st=$(curl -sS "$PONTE/status?slug=$SLUG" -H "x-robo: $ROBO_TOKEN" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("status") or d)' 2>&1 || echo "?")
   echo "  $(( ($(date +%s)-inicio)/60 )) min: $st"
-  case "$st" in *complete*|*COMPLETE*) break ;; *error*|*ERROR*|*cancel*|*CANCEL*) break ;; esac
+  case "$st" in *omplete*|*OMPLETE*) break ;; *rror*|*RROR*|*ancel*|*ANCEL*) break ;; esac
   [ $(( $(date +%s)-inicio )) -gt 5400 ] && { echo "  passou de 90 min, parando de esperar"; break; }
 done
 
 echo "== 4) baixando os vídeos"
-kaggle kernels output "$U/cenaria-animar" -p "$TRAB/saida" || true
+curl -sS "$PONTE/output?slug=$SLUG" -H "x-robo: $ROBO_TOKEN" > "$TRAB/output.json"
+python3 - "$TRAB/output.json" "$TRAB/saida" <<'PY'
+import json, sys, urllib.request, os
+d = json.load(open(sys.argv[1])); dest = sys.argv[2]
+for f in d.get('files', []):
+    nome = os.path.basename(f.get('fileName') or f.get('name') or '')
+    if not nome: continue
+    urllib.request.urlretrieve(f['url'], os.path.join(dest, nome)); print('  baixado', nome)
+log = d.get('log') or ''
+open(os.path.join(dest, 'kaggle.log'), 'w').write(log if isinstance(log, str) else json.dumps(log))
+PY
 ls -la "$TRAB/saida"
 [ -f "$TRAB/saida/relatorio.json" ] && cat "$TRAB/saida/relatorio.json"
-tail -60 "$TRAB"/saida/*.log 2>/dev/null || true
+tail -c 4000 "$TRAB/saida/kaggle.log" 2>/dev/null || true
 
 echo "== 5) montando a amostra (cena original 1 s + animação de cada cena)"
 mkdir -p /tmp/amostra; lista=/tmp/amostra/lista.txt; : > "$lista"
