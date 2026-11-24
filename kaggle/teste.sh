@@ -9,30 +9,32 @@ TRAB=/tmp/kaggle; rm -rf "$TRAB"; mkdir -p "$TRAB/dados" "$TRAB/saida"
 
 ESTILO='dark dreamcore cinematic film still, liminal and eerie atmosphere, muted cold teal and deep blue palette with faint amber light, thin fog and volumetric haze, lonely tiny human silhouettes or astronauts against vast emptiness, deep black shadows, soft focus, 35mm film grain look, photorealistic'
 
-# id | cena (imagem) | ação física | movimento de câmera
+# id | cena (imagem) | o que acontece na cena (descrição visual pura) | câmera | guia | negativo extra
+# Nada de negação no prompt positivo ("no characters" ativa "characters"): proibições só no negativo.
+# Astronauta pequeno ocupa 1-2 blocos do latente: o movimento forte vai para o cenário, não para as pernas.
+PESSOAS='person, people, human, man, woman, astronaut, character, figure, silhouette, crowd, face, body, creature'
 CENAS=(
-"c1|a lone tiny astronaut standing on a dark rocky plain under a huge dying red star|the astronaut walks forward across the rocks while the dying star pulses and throws flares, thick fog rolls fast across the ground|camera dolly push-in toward the astronaut"
-"c2|a giant radio telescope dish in a dark desert at night under a faint green sky glow|the radio telescope dish rotates clearly toward the sky while dust blows across the desert and clouds race overhead|camera tracking shot moving sideways past the dish"
-"c3|a lonely gas giant planet with thin rings floating in deep black space|the planet spins visibly, storm clouds swirl across its surface and ring particles stream around it|camera orbiting around the planet"
-"c4|an endless empty corridor with a single amber light at the far end and a small astronaut silhouette|the astronaut walks toward the light while the amber light flickers and dust particles fly toward the camera|camera moving forward down the corridor"
+"c1|a lone tiny astronaut standing on a dark rocky plain under a huge dying red star|the astronaut stands firm while the dying red star pulses and throws bright flares, dense fog rushes low across the rocks|slow steady dolly push-in toward the astronaut|3.0|"
+"c2|a giant radio telescope dish in a dark desert at night under a faint green sky glow|the radio telescope dish slowly rotates toward the sky, dust blows across the desert floor, low clouds drift fast overhead|slow lateral tracking shot past the dish|3.0|$PESSOAS"
+"c3|a lonely gas giant planet with thin rings floating in deep black space|storm clouds swirl across the planet surface and particles glitter as they flow along the rings|very slow subtle camera drift keeping the ringed planet centered in frame|2.8|$PESSOAS"
+"c4|an endless empty corridor with a single amber light at the far end and a small astronaut silhouette|the amber light flickers, dust particles float toward the camera, the astronaut silhouette stands still in the distance|slow steady dolly forward down the corridor|3.0|crowd, many people, extra figures"
 )
 
 echo "== 1) gerando as imagens no Cenaria (mesmas IAs grátis do robô)"
-json='{"modelo":"Lightricks/LTX-Video","largura":512,"altura":896,"quadros":97,"passos":30,"guia":4.0,"cenas":['
+json='{"modelo":"Lightricks/LTX-Video","largura":512,"altura":896,"quadros":97,"passos":40,"guia":3.0,"cenas":['
 primeiro=1
 for linha in "${CENAS[@]}"; do
-  IFS='|' read -r id cena acao camera <<< "$linha"
+  IFS='|' read -r id cena acao camera guia negx <<< "$linha"
   prompt_img="$cena, $ESTILO"
   curl -sS --fail -G "$SITE/api/imagem" -H "x-robo: $ROBO_TOKEN" \
     --data-urlencode "prompt=$prompt_img" --data-urlencode "w=1080" --data-urlencode "h=1920" --data-urlencode "seed=7" \
     -o "$TRAB/dados/$id.jpg"
   echo "  $id: $(stat -c%s "$TRAB/dados/$id.jpg") bytes"
   mov="$cena."
-  # LTX-Video responde a verbos de ação fortes; "slow/still/stable" no prompt deixava a cena quase parada
-  mov="$mov $acao. $camera. Strong, continuous, clearly visible motion from the first to the last frame."
-  mov="$mov Same art style, colors and lighting as the start frame (dark dreamcore, fog, film grain). Single continuous shot, no text, no new characters."
+  # descrição visual pura e contínua (o LTX-Video entende melhor que comandos/negações)
+  mov="$mov $acao. $camera. Dark dreamcore cinematic look, fog, film grain."
   [ $primeiro = 1 ] || json="$json,"; primeiro=0
-  json="$json$(python3 -c 'import json,sys; print(json.dumps({"id":sys.argv[1],"arquivo":sys.argv[1]+".jpg","prompt":sys.argv[2],"seed":42}))' "$id" "$mov")"
+  json="$json$(python3 -c 'import json,sys; print(json.dumps({"id":sys.argv[1],"arquivo":sys.argv[1]+".jpg","prompt":sys.argv[2],"seed":42,"guia":float(sys.argv[3]),"negativo_extra":sys.argv[4]}))' "$id" "$mov" "$guia" "$negx")"
 done
 echo "$json]}" > "$TRAB/dados/cenas.json"
 
