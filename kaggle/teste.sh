@@ -11,14 +11,14 @@ ESTILO='dark dreamcore cinematic film still, liminal and eerie atmosphere, muted
 
 # id | cena (imagem) | ação física | movimento de câmera
 CENAS=(
-"c1|a lone tiny astronaut standing on a dark rocky plain under a huge dying red star|the dying star pulses slowly and fog drifts across the ground|slow smooth camera push-in toward the main subject"
-"c2|a giant radio telescope dish in a dark desert at night under a faint green sky glow|the radio telescope dish slowly turns toward the sky|slow steady horizontal camera pan across the scene"
-"c3|a lonely gas giant planet with thin rings floating in deep black space|the planet slowly rotates, clouds drifting across its surface|gentle slow camera orbit around the main subject"
-"c4|an endless empty corridor with a single amber light at the far end and a small astronaut silhouette||static camera, only subtle natural motion: blinking, breathing, soft light flicker, floating particles"
+"c1|a lone tiny astronaut standing on a dark rocky plain under a huge dying red star|the astronaut walks forward across the rocks while the dying star pulses and throws flares, thick fog rolls fast across the ground|camera dolly push-in toward the astronaut"
+"c2|a giant radio telescope dish in a dark desert at night under a faint green sky glow|the radio telescope dish rotates clearly toward the sky while dust blows across the desert and clouds race overhead|camera tracking shot moving sideways past the dish"
+"c3|a lonely gas giant planet with thin rings floating in deep black space|the planet spins visibly, storm clouds swirl across its surface and ring particles stream around it|camera orbiting around the planet"
+"c4|an endless empty corridor with a single amber light at the far end and a small astronaut silhouette|the astronaut walks toward the light while the amber light flickers and dust particles fly toward the camera|camera moving forward down the corridor"
 )
 
 echo "== 1) gerando as imagens no Cenaria (mesmas IAs grátis do robô)"
-json='{"modelo":"Lightricks/LTX-Video","largura":512,"altura":896,"quadros":97,"passos":30,"guia":3.0,"cenas":['
+json='{"modelo":"Lightricks/LTX-Video","largura":512,"altura":896,"quadros":97,"passos":30,"guia":4.0,"cenas":['
 primeiro=1
 for linha in "${CENAS[@]}"; do
   IFS='|' read -r id cena acao camera <<< "$linha"
@@ -28,8 +28,9 @@ for linha in "${CENAS[@]}"; do
     -o "$TRAB/dados/$id.jpg"
   echo "  $id: $(stat -c%s "$TRAB/dados/$id.jpg") bytes"
   mov="$cena."
-  [ -n "$acao" ] && mov="$mov Main motion: $acao. The motion is clearly visible from the first to the last frame. Camera: nearly still, only a $camera." || mov="$mov Camera: $camera."
-  mov="$mov Keep exactly the same art style, colors, lighting and characters as the start frame (dark dreamcore, fog, film grain). Smooth, slow, stable, continuous single shot. No text, no morphing, no new characters appearing."
+  # LTX-Video responde a verbos de ação fortes; "slow/still/stable" no prompt deixava a cena quase parada
+  mov="$mov $acao. $camera. Strong, continuous, clearly visible motion from the first to the last frame."
+  mov="$mov Same art style, colors and lighting as the start frame (dark dreamcore, fog, film grain). Single continuous shot, no text, no new characters."
   [ $primeiro = 1 ] || json="$json,"; primeiro=0
   json="$json$(python3 -c 'import json,sys; print(json.dumps({"id":sys.argv[1],"arquivo":sys.argv[1]+".jpg","prompt":sys.argv[2],"seed":42}))' "$id" "$mov")"
 done
@@ -89,7 +90,7 @@ for linha in "${CENAS[@]}"; do
   id="${linha%%|*}"
   [ -f "$TRAB/saida/$id.mp4" ] || continue
   ffmpeg -y -loglevel error -i "$TRAB/saida/$id.mp4" \
-    -vf "scale=1080:1920:flags=lanczos,eq=contrast=1.05:saturation=0.9,noise=alls=8:allf=t,vignette=PI/5" \
+    -vf "scale=1188:2112:flags=lanczos,crop=1080:1920:(iw-1080)/2+(iw-1080)/2*sin(t*0.6):(ih-1920)/2*(1-t/4),eq=contrast=1.05:saturation=0.9,noise=alls=8:allf=t,vignette=PI/5" \
     -c:v libx264 -preset veryfast -crf 20 -pix_fmt yuv420p -an "/tmp/amostra/$id.mp4"
   echo "file '/tmp/amostra/$id.mp4'" >> "$lista"
 done

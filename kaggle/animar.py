@@ -51,7 +51,7 @@ cenas = config['cenas']
 W, H = int(config.get('largura', 512)), int(config.get('altura', 896))       # múltiplos de 32, vertical 9:16
 QUADROS = int(config.get('quadros', 97))                                     # 8k+1 quadros; 97 = 4 s a 24 fps
 PASSOS = int(config.get('passos', 30))
-NEG = config.get('negativo', 'worst quality, inconsistent motion, blurry, jittery, distorted, text, subtitles, watermark, logo')
+NEG = config.get('negativo', 'worst quality, static, still image, frozen, no motion, inconsistent motion, blurry, jittery, distorted, text, subtitles, watermark, logo')
 
 # T4/P100 não têm bfloat16: usa float16 com o VAE em float32 (evita quadros pretos por estouro numérico)
 modelo = config.get('modelo', 'Lightricks/LTX-Video')
@@ -78,11 +78,15 @@ for c in cenas:
     info = {'id': c['id'], 'ok': False}
     try:
         img = load_image(os.path.join(base, c['arquivo'])).convert('RGB').resize((W, H))
-        quadros = pipe(
+        args = dict(
             image=img, prompt=c['prompt'], negative_prompt=NEG, width=W, height=H,
             num_frames=QUADROS, num_inference_steps=PASSOS, guidance_scale=float(config.get('guia', 3.0)),
             generator=torch.Generator(device='cuda').manual_seed(int(c.get('seed', 42))),
-        ).frames[0]
+        )
+        try:  # ruído no quadro inicial/decodificação = mais movimento (versões novas do diffusers)
+            quadros = pipe(**args, decode_timestep=0.05, decode_noise_scale=0.025).frames[0]
+        except TypeError:
+            quadros = pipe(**args).frames[0]
         destino = os.path.join(SAIDA, f"{c['id']}.mp4")
         export_to_video(quadros, destino, fps=24)
         # quadro todo preto = estouro numérico (NaN) no float16
