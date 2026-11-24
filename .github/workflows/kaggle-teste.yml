@@ -1,0 +1,33 @@
+# Fase 2 (teste): animação grátis na GPU do Kaggle. Só roda quando disparado à mão; não mexe no robô diário.
+# Segredos necessários: ROBO_TOKEN (já existe), KAGGLE_USERNAME e KAGGLE_KEY.
+# O resultado fica como "artifact" por 3 dias (precisa estar logado no GitHub para baixar).
+name: Kaggle teste
+
+on:
+  workflow_dispatch:
+
+concurrency: kaggle-teste
+
+jobs:
+  animar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Instalar ffmpeg e Kaggle CLI
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+          pip install -q kaggle
+      - name: Animar 4 cenas no Kaggle
+        env:
+          ROBO_TOKEN: ${{ secrets.ROBO_TOKEN }}
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+        run: bash kaggle/teste.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kaggle-teste
+          path: /tmp/amostra/
+          retention-days: 3
+          if-no-files-found: ignore
