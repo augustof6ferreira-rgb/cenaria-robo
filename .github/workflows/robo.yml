@@ -5,8 +5,8 @@
 name: Cenaria robô
 
 on:
-  # Sem "schedule": o agendamento do GitHub atrasava horas. Quem dispara às 11h53 (Brasília)
-  # é a tarefa agendada do Claude "Cenaria: disparar o robô" (via API, na hora certa).
+  # Sem "schedule": o agendamento do GitHub atrasava horas. Quem dispara às 2h56 (Brasília, madrugada)
+  # é o cron do Cloudflare (site cenaria), que também confere e tenta de novo até 6h30.
   workflow_dispatch:       # disparo pela tarefa do Claude ou pelo botão "Run workflow"
     inputs:
       qtd:
