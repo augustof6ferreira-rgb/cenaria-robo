@@ -50,10 +50,14 @@ PY
 echo "  código: $(stat -c%s "$TRAB/kernel.py") bytes"
 
 echo "== 3) disparando a GPU do Kaggle (pela ponte do Cenaria)"
-python3 -c 'import json,sys; print(json.dumps({"titulo":"cenaria-animar","codigo":open(sys.argv[1]).read()}))' "$TRAB/kernel.py" > "$TRAB/push.json"
-resp=$(curl -sS -X POST "$PONTE/push?slug=$SLUG" -H "x-robo: $ROBO_TOKEN" -H 'content-type: application/json' --data-binary @"$TRAB/push.json")
-echo "  resposta: $resp"
-echo "$resp" | grep -qi '"error"\|"erro"' && { echo "PUSH FALHOU"; exit 1; }
+if [ "${SO_ACOMPANHAR:-}" = "1" ]; then
+  echo "  SO_ACOMPANHAR=1: não envia de novo, só acompanha a última versão"
+else
+  python3 -c 'import json,sys; print(json.dumps({"titulo":"cenaria-animar","codigo":open(sys.argv[1]).read()}))' "$TRAB/kernel.py" > "$TRAB/push.json"
+  resp=$(curl -sS -X POST "$PONTE/push?slug=$SLUG" -H "x-robo: $ROBO_TOKEN" -H 'content-type: application/json' --data-binary @"$TRAB/push.json")
+  echo "  resposta: ${resp:0:300}"
+  echo "$resp" | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(1 if (d.get("hasError") or d.get("erro") or d.get("code",200)>=400) else 0)' || { echo "PUSH FALHOU"; exit 1; }
+fi
 inicio=$(date +%s)
 while true; do
   sleep 30

@@ -5,6 +5,10 @@ name: Kaggle teste
 
 on:
   workflow_dispatch:
+    inputs:
+      so_acompanhar:
+        description: '1 = não envia de novo ao Kaggle, só acompanha e baixa a última versão'
+        default: '0'
 
 concurrency: kaggle-teste
 
@@ -19,6 +23,7 @@ jobs:
       - name: Animar 4 cenas no Kaggle
         env:
           ROBO_TOKEN: ${{ secrets.ROBO_TOKEN }}
+          SO_ACOMPANHAR: ${{ github.event.inputs.so_acompanhar || '0' }}
         run: bash kaggle/teste.sh
       - uses: actions/upload-artifact@v4
         if: always()
