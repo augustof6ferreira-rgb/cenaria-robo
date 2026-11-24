@@ -21,7 +21,7 @@ CENAS=(
 )
 
 echo "== 1) gerando as imagens no Cenaria (mesmas IAs grátis do robô)"
-json='{"modelo":"Lightricks/LTX-Video","largura":512,"altura":896,"quadros":97,"passos":40,"guia":3.0,"cenas":['
+json="{\"modelo\":\"${MODELO:-Lightricks/LTX-Video}\",\"largura\":512,\"altura\":896,\"quadros\":97,\"passos\":40,\"guia\":3.0,\"cenas\":["
 primeiro=1
 for linha in "${CENAS[@]}"; do
   IFS='|' read -r id cena acao camera guia negx <<< "$linha"

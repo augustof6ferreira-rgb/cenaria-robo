@@ -9,6 +9,9 @@ on:
       so_acompanhar:
         description: '1 = não envia de novo ao Kaggle, só acompanha e baixa a última versão'
         default: '0'
+      modelo:
+        description: 'modelo do Hugging Face (ex.: Lightricks/LTX-Video-0.9.5)'
+        default: 'Lightricks/LTX-Video'
 
 concurrency: kaggle-teste
 
@@ -27,6 +30,7 @@ jobs:
         env:
           ROBO_TOKEN: ${{ secrets.ROBO_TOKEN }}
           SO_ACOMPANHAR: ${{ github.event.inputs.so_acompanhar || '0' }}
+          MODELO: ${{ github.event.inputs.modelo || 'Lightricks/LTX-Video' }}
         run: bash kaggle/teste.sh
       - uses: actions/upload-artifact@v4
         if: always()
