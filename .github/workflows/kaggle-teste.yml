@@ -12,6 +12,9 @@ on:
 
 concurrency: kaggle-teste
 
+permissions:
+  contents: write
+
 jobs:
   animar:
     runs-on: ubuntu-latest
@@ -32,3 +35,13 @@ jobs:
           path: /tmp/amostra/
           retention-days: 3
           if-no-files-found: ignore
+      # cópia leve no branch "amostras" (dá para baixar sem login e publicar no site)
+      - name: Publicar amostra leve no branch amostras
+        if: success()
+        run: |
+          ffmpeg -y -loglevel error -i /tmp/amostra/kaggle-teste.mp4 -vf scale=720:1280 -c:v libx264 -preset veryfast -crf 24 -pix_fmt yuv420p -movflags +faststart /tmp/kaggle-teste.mp4
+          git config user.name "cenaria-robo"; git config user.email "robo@cenariavideos.com"
+          git checkout --orphan amostras-tmp
+          git rm -rfq . ; cp /tmp/kaggle-teste.mp4 . ; cp /tmp/amostra/relatorio.json . 2>/dev/null || true
+          git add kaggle-teste.mp4 relatorio.json; git commit -qm "amostra kaggle $(date -u +%F' '%H:%M)"
+          git push -fq origin HEAD:amostras
