@@ -59,6 +59,15 @@ relatorio['modelo'] = modelo
 t0 = time.time()
 pipe = LTXImageToVideoPipeline.from_pretrained(modelo, torch_dtype=torch.float16)
 pipe.vae.to(torch.float32)
+# o pipeline manda imagem/latentes em float16 para o VAE: converte na entrada do VAE (float32)
+def _f32(f):
+    def g(*a, **k):
+        a = [x.float() if torch.is_tensor(x) and x.is_floating_point() else x for x in a]
+        k = {n: (v.float() if torch.is_tensor(v) and v.is_floating_point() else v) for n, v in k.items()}
+        return f(*a, **k)
+    return g
+pipe.vae.encode = _f32(pipe.vae.encode)
+pipe.vae.decode = _f32(pipe.vae.decode)
 pipe.vae.enable_tiling()
 pipe.enable_model_cpu_offload()   # cabe nos 16 GB da T4
 relatorio['carregar_modelo_s'] = round(time.time() - t0, 1)
