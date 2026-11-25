@@ -1,0 +1,26 @@
+# Gera as imagens de exemplo dos estilos (vitrine da landing). Só roda à mão. Resultado no branch "estilos".
+name: Estilos vitrine
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  estilos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Gerar imagens
+        env:
+          ROBO_TOKEN: ${{ secrets.ROBO_TOKEN }}
+        run: node estilos.mjs
+      - name: Publicar no branch estilos
+        if: success()
+        run: |
+          git config user.name "cenaria-robo"; git config user.email "robo@cenariavideos.com"
+          git checkout --orphan estilos-tmp
+          git rm -rfq . ; cp /tmp/estilos/*.jpg . ; git add *.jpg
+          git commit -qm "estilos $(date -u +%F' '%H:%M)"; git push -fq origin HEAD:estilos
