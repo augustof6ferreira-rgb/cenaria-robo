@@ -53,6 +53,7 @@ else:
     base = os.path.dirname(entrada[0])
     config = json.load(open(entrada[0]))
 cenas = config['cenas']
+relatorio['id_lote'] = config.get('id_lote')  # o site confere que o relatório é do lote que ele enviou
 W, H = int(config.get('largura', 512)), int(config.get('altura', 896))       # múltiplos de 32, vertical 9:16
 QUADROS = int(config.get('quadros', 97))                                     # 8k+1 quadros; 97 = 4 s a 24 fps
 PASSOS = int(config.get('passos', 40))
