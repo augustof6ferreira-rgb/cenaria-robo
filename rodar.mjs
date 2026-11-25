@@ -2,7 +2,7 @@
 // padroniza o MP4 (H.264 + AAC, aceito por TikTok e YouTube) e envia ao cofre (R2) com os metadados.
 import { chromium } from 'playwright';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, statSync } from 'node:fs';
+import { readFileSync, statSync, writeFileSync, existsSync } from 'node:fs';
 
 const SITE = (process.env.SITE || 'https://cenaria.cenaria-z2.workers.dev').replace(/\/$/, '');
 const TOKEN = process.env.ROBO_TOKEN;
@@ -76,8 +76,26 @@ for (const v of r?.videos || []) {
   console.log(`✔ vídeo ${v.ordem + 1} no cofre: ${j.titulo} · nota ${j.nota} · ${(statSync(final).size / 1048576).toFixed(1)} MB · posta ${j.quando}`);
   // textos exatos do post para a tarefa que agenda no Metricool (ela lê este log com `gh api` e decodifica com base64 -d;
   // a leitura pelo site resumia a legenda em vez de copiar)
+  // capa dreamcore: quadro da abertura + título curto (Instagram usa; YouTube/TikTok só em contas verificadas/empresa)
+  let capa = '';
+  try {
+    const curto = String(j.titulo || '').split(/[:–—|]/)[0].trim().toUpperCase().slice(0, 48);
+    const linhas = []; let atual = '';
+    for (const w of curto.split(/\s+/)) { if ((atual + ' ' + w).trim().length > 16 && atual) { linhas.push(atual); atual = w; } else atual = (atual + ' ' + w).trim(); }
+    if (atual) linhas.push(atual);
+    const txt = bruto.replace(/\.mp4$/, '-capa.txt'), jpg = bruto.replace(/\.mp4$/, '-capa.jpg');
+    writeFileSync(txt, linhas.slice(0, 3).join('\n'));
+    const fonte = ['/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf'].find(existsSync);
+    const vf = ['scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920', 'eq=contrast=1.06:saturation=0.85', 'vignette=PI/4.5',
+      'drawbox=x=0:y=ih*0.48:w=iw:h=ih*0.52:color=black@0.18:t=fill', 'drawbox=x=0:y=ih*0.56:w=iw:h=ih*0.44:color=black@0.2:t=fill', 'drawbox=x=0:y=ih*0.62:w=iw:h=ih*0.38:color=black@0.22:t=fill',
+      ...(fonte ? [`drawtext=fontfile=${fonte}:textfile=${txt}:fontsize=96:line_spacing=14:fontcolor=white:borderw=6:bordercolor=black@0.85:x=(w-text_w)/2:y=h*0.64`] : [])].join(',');
+    execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-ss', '1.2', '-i', final, '-frames:v', '1', '-vf', vf, '-q:v', '3', jpg]);
+    const rc = await fetch(`${SITE}/api/robo/capa?id=${j.id}`, { method: 'PUT', headers: { 'x-robo': TOKEN, 'content-type': 'image/jpeg' }, body: readFileSync(jpg) });
+    const jc = await rc.json().catch(() => ({}));
+    if (rc.ok) capa = jc.capa || ''; else console.log(`capa ${v.ordem + 1}: envio falhou (${rc.status}) ${jc.erro || ''}`);
+  } catch (e) { console.log(`capa ${v.ordem + 1}: ${e.message}`); }
   const tags = (j.hashtags || []).map((h) => `#${String(h).replace(/^#/, '')}`).join(' ');
-  const post = { id: j.id, titulo: j.titulo || '', texto: [String(j.descricao || '').trim(), tags].filter(Boolean).join('\n\n'), comentario: j.comentario || '' };
+  const post = { id: j.id, titulo: j.titulo || '', texto: [String(j.descricao || '').trim(), tags].filter(Boolean).join('\n\n'), comentario: j.comentario || '', capa };
   console.log(`[post] ${j.id} ${Buffer.from(JSON.stringify(post)).toString('base64')}`);
 }
 for (const e of r?.erros || []) console.log('erro:', e);
