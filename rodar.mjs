@@ -36,7 +36,8 @@ page.on('download', async (d) => {
   console.log('baixado', d.suggestedFilename());
 });
 
-await page.goto(`${SITE}/?robo=1&qtd=${QTD}`, { waitUntil: 'domcontentloaded' });
+const VITRINE = process.env.MODO === 'vitrine'; // vídeo de apresentação da landing (não vai para a fila de posts)
+await page.goto(`${SITE}/?robo=1&${VITRINE ? 'modo=vitrine' : `qtd=${QTD}`}`, { waitUntil: 'domcontentloaded' });
 const ini = Date.now();
 let estado;
 for (;;) {
@@ -51,6 +52,15 @@ const r = await page.evaluate(() => window.__robo).catch(() => null);
 await page.waitForTimeout(5000); // termina de salvar o último download
 await browser.close();
 
+if (VITRINE) {
+  const bruto = arquivos.get('vitrine.mp4');
+  for (const e of r?.erros || []) console.log('erro:', e);
+  if (!bruto) { console.log('vitrine: download não chegou'); process.exit(1); }
+  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', bruto, '-c:v', 'libx264', '-preset', 'slow', '-crf', '19', '-pix_fmt', 'yuv420p',
+    '-c:a', 'aac', '-b:a', '160k', '-ar', '48000', '-movflags', '+faststart', '/tmp/vitrine-final.mp4'], { stdio: 'inherit' });
+  console.log(`vitrine pronta: ${(statSync('/tmp/vitrine-final.mp4').size / 1048576).toFixed(1)} MB · ${r?.videos?.[0]?.duracao || '?'} s`);
+  process.exit(0);
+}
 let enviados = 0;
 let descartados = 0;
 for (const v of r?.videos || []) {

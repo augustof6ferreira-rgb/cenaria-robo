@@ -12,8 +12,14 @@ on:
       qtd:
         description: 'Quantos vídeos'
         default: '2'
+      modo:
+        description: 'vazio = robô diário; "vitrine" = só o vídeo de apresentação da landing (publica no branch vitrine)'
+        default: ''
 
 concurrency: robo
+
+permissions:
+  contents: write
 
 jobs:
   videos:
@@ -35,5 +41,14 @@ jobs:
         env:
           ROBO_TOKEN: ${{ secrets.ROBO_TOKEN }}
           QTD: ${{ github.event.inputs.qtd || '2' }}
+          MODO: ${{ github.event.inputs.modo || '' }}
         working-directory: /tmp/robo
         run: node rodar.mjs
+      - name: Publicar a vitrine no branch vitrine
+        if: ${{ success() && github.event.inputs.modo == 'vitrine' }}
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          git config user.name "cenaria-robo"; git config user.email "robo@cenariavideos.com"
+          git checkout --orphan vitrine-tmp
+          git rm -rfq . ; cp /tmp/vitrine-final.mp4 vitrine.mp4; git add vitrine.mp4
+          git commit -qm "vitrine $(date -u +%F' '%H:%M)"; git push -fq origin HEAD:vitrine
