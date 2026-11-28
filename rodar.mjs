@@ -37,7 +37,8 @@ page.on('download', async (d) => {
 });
 
 const VITRINE = process.env.MODO === 'vitrine'; // vídeo de apresentação da landing (não vai para a fila de posts)
-await page.goto(`${SITE}/?robo=1&${VITRINE ? 'modo=vitrine' : `qtd=${QTD}`}`, { waitUntil: 'domcontentloaded' });
+const ESTILO = /^(anos70|dreamcore)$/.test(process.env.ESTILO || '') ? `&estilo=${process.env.ESTILO}` : '';
+await page.goto(`${SITE}/?robo=1&${VITRINE ? 'modo=vitrine' : `qtd=${QTD}${ESTILO}`}`, { waitUntil: 'domcontentloaded' });
 const ini = Date.now();
 let estado;
 for (;;) {

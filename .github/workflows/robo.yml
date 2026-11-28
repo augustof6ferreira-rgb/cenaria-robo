@@ -15,6 +15,9 @@ on:
       modo:
         description: 'vazio = robô diário; "vitrine" = só o vídeo de apresentação da landing (publica no branch vitrine)'
         default: ''
+      estilo:
+        description: 'vazio = automático (17h escuro, 20h anos 70); "anos70" ou "dreamcore" força o estilo de todos os vídeos'
+        default: ''
 
 concurrency: robo
 
@@ -42,6 +45,7 @@ jobs:
           ROBO_TOKEN: ${{ secrets.ROBO_TOKEN }}
           QTD: ${{ github.event.inputs.qtd || '2' }}
           MODO: ${{ github.event.inputs.modo || '' }}
+          ESTILO: ${{ github.event.inputs.estilo || '' }}
         working-directory: /tmp/robo
         run: node rodar.mjs
       - name: Publicar a vitrine no branch vitrine
