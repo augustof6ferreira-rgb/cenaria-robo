@@ -74,8 +74,15 @@ for (const v of r?.videos || []) {
   const bruto = arquivos.get(v.arquivo);
   if (!bruto) { console.log(`vídeo ${v.ordem + 1}: download não chegou`); continue; }
   const final = bruto.replace(/\.mp4$/, '-final.mp4');
-  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', bruto, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p',
+  // teto de tamanho: o envio ao cofre recusava acima de ~100 MB (erro 413 = "vídeo grande demais") e o rascunho do TikTok aceita até 64 MB.
+  // Bitrate calculado para caber em ~58 MB pela duração (90 s -> ~4,9 Mbps, sem perda visível com o filtro dreamcore).
+  const dur = Math.max(30, Number(v.duracao) || 120);
+  const kbps = Math.max(1200, Math.min(6000, Math.floor((58 * 8 * 1024) / dur) - 160));
+  const codificar = (k) => execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', bruto, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20',
+    '-maxrate', `${k}k`, '-bufsize', `${k * 2}k`, '-pix_fmt', 'yuv420p',
     '-c:a', 'aac', '-b:a', '160k', '-ar', '48000', '-movflags', '+faststart', final], { stdio: 'inherit' });
+  codificar(kbps);
+  if (statSync(final).size > 62 * 1048576) { console.log(`vídeo ${v.ordem + 1}: ainda grande, recomprimindo`); codificar(Math.floor(kbps * 0.7)); }
   const meta = Buffer.from(JSON.stringify({ ...v, arquivo: undefined })).toString('base64');
   const resp = await fetch(`${SITE}/api/robo/video`, {
     method: 'PUT', headers: { 'x-robo': TOKEN, 'x-meta': meta, 'content-type': 'video/mp4' }, body: readFileSync(final),
